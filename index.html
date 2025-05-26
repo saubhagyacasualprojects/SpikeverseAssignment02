@@ -1,0 +1,2025 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpikeVerse Assignment 02: Prioritized Double DQN</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #1976d2;
+            --primary-dark: #1565c0;
+            --primary-light: #42a5f5;
+            --accent-color: #ff4081;
+            --background-color: #fafafa;
+            --surface-color: #ffffff;
+            --text-primary: #212121;
+            --text-secondary: #757575;
+            --text-hint: #9e9e9e;
+            --divider-color: #e0e0e0;
+            --success-color: #4caf50;
+            --warning-color: #ff9800;
+            --error-color: #f44336;
+            --shadow-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+            --shadow-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
+            --shadow-3: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+        }
+
+        .app-container {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
+            color: white;
+            padding: 2rem 0;
+            box-shadow: var(--shadow-2);
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+            min-width: 100%;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 1;
+            width: 100%;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header-subtitle {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            font-weight: 300;
+        }
+
+        .header-meta {
+            margin-top: 1.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.95rem;
+        }
+
+        .meta-item .material-icons {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+
+        /* Search and Controls */
+        .controls {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            align-items: center;
+        }
+
+        .search-container {
+            position: relative;
+            flex: 1;
+            min-width: 500px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1rem 1rem 3rem;
+            border: 2px solid var(--divider-color);
+            border-radius: var(--border-radius);
+            font-size: 1rem;
+            background: var(--surface-color);
+            transition: var(--transition);
+            box-shadow: var(--shadow-1);
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: var(--shadow-2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-hint);
+            pointer-events: none;
+        }
+
+        .filter-chips {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            padding: 0.5rem 1rem;
+            background: var(--surface-color);
+            border: 2px solid var(--divider-color);
+            border-radius: 25px;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .chip:hover, .chip.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-2);
+        }
+
+        .progress-bar {
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            padding: 1rem;
+            box-shadow: var(--shadow-1);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            min-width: 200px;
+        }
+
+        .progress-ring {
+            width: 40px;
+            height: 40px;
+            position: relative;
+        }
+
+        .progress-ring svg {
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring circle {
+            fill: none;
+            stroke-width: 3;
+            r: 16;
+            cx: 20;
+            cy: 20;
+        }
+
+        .progress-ring .background {
+            stroke: var(--divider-color);
+        }
+
+        .progress-ring .progress {
+            stroke: var(--primary-color);
+            stroke-dasharray: 100;
+            stroke-dashoffset: 100;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        /* Main Content */
+        .main-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem 4rem;
+            flex: 1;
+        }
+
+        /* Overview Card */
+        .overview-card {
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-1);
+            transition: var(--transition);
+        }
+
+        .overview-card:hover {
+            box-shadow: var(--shadow-2);
+            transform: translateY(-2px);
+        }
+
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .overview-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .overview-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-1);
+        }
+
+        .overview-icon {
+            width: 48px;
+            height: 48px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        /* Task Cards */
+        .task-card {
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow-1);
+            transition: var(--transition);
+            overflow: hidden;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        .task-card:hover {
+            box-shadow: var(--shadow-2);
+            transform: translateY(-2px);
+        }
+
+        .task-header {
+            padding: 1.5rem 2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, #fafafa, #f5f5f5);
+            transition: var(--transition);
+        }
+
+        .task-header:hover {
+            background: linear-gradient(135deg, #f0f0f0, #e8e8e8);
+        }
+
+        .task-title {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex: 1;
+        }
+
+        .task-number {
+            width: 40px;
+            height: 40px;
+            background: var(--primary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .task-info h3 {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .task-description {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .task-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .expand-icon {
+            color: var(--text-hint);
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .task-card.expanded .expand-icon {
+            transform: rotate(180deg);
+        }
+
+        .task-content {
+            padding: 0 2rem;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.4s cubic-bezier(0.4, 0.0, 0.2, 1);
+        }
+
+        .task-card.expanded .task-content {
+            max-height: 5000px;
+            padding: 0 2rem 2rem;
+        }
+
+        .task-body {
+            padding-top: 1rem;
+        }
+
+        /* Subtasks */
+        .subtask-grid {
+            display: grid;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .subtask-item {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            border-left: 3px solid var(--primary-light);
+            transition: var(--transition);
+        }
+
+        .subtask-item:hover {
+            background: #e9ecef;
+            transform: translateX(4px);
+        }
+
+        .subtask-header {
+            display: flex;
+            align-items: center;
+            justify-content: between;
+            gap: 1rem;
+            cursor: pointer;
+        }
+
+        .subtask-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            flex: 1;
+        }
+
+        .subtask-content {
+            margin-top: 0.5rem;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+
+        .subtask-item.expanded .subtask-content {
+            max-height: 1000px;
+            margin-top: 1rem;
+        }
+
+        /* Code Blocks */
+        .code-block {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.5;
+            box-shadow: var(--shadow-1);
+        }
+
+        .code-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #333;
+        }
+
+        .code-language {
+            color: var(--primary-light);
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #555;
+            color: #d4d4d4;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: var(--transition);
+        }
+
+        .copy-btn:hover {
+            background: #333;
+            border-color: var(--primary-light);
+        }
+
+        /* Lists */
+        .requirement-list {
+            list-style: none;
+            margin: 1rem 0;
+        }
+
+        .requirement-list li {
+            padding: 0.5rem 0;
+            padding-left: 2rem;
+            position: relative;
+            transition: var(--transition);
+        }
+
+        .requirement-list li:before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            top: 0.5rem;
+            color: var(--success-color);
+            font-weight: bold;
+        }
+
+        .requirement-list li:hover {
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 4px;
+            transform: translateX(4px);
+        }
+
+        /* Status indicators */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-badge.todo {
+            background: rgba(158, 158, 158, 0.1);
+            color: var(--text-hint);
+        }
+
+        .status-badge.in-progress {
+            background: rgba(255, 152, 0, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-badge.completed {
+            background: rgba(76, 175, 80, 0.1);
+            color: var(--success-color);
+        }
+
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 56px;
+            height: 56px;
+            background: var(--accent-color);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: var(--shadow-3);
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 14px 28px rgba(0,0,0,0.25), 0 10px 10px rgba(0,0,0,0.22);
+        }
+
+        .full-width-image {
+            width: 85%;
+            height: auto;
+            display: block;
+        }
+
+
+        /* Navigation */
+        .nav-drawer {
+            position: fixed;
+            top: 0;
+            left: -320px;
+            width: 320px;
+            height: 100vh;
+            background: var(--surface-color);
+            box-shadow: var(--shadow-3);
+            transition: var(--transition);
+            z-index: 1001;
+            overflow-y: auto;
+        }
+
+        .nav-drawer.open {
+            left: 0;
+        }
+
+        .nav-header {
+            padding: 2rem;
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .nav-content {
+            padding: 1rem;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-item:hover {
+            background: var(--background-color);
+        }
+
+        .nav-item.active {
+            background: rgba(25, 118, 210, 0.1);
+            color: var(--primary-color);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+
+        .overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        @media (max-width: 768px) {
+            /* Ensure full width layout on mobile */
+            .header {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-sizing: border-box !important;
+                position: relative !important;
+                left: auto !important;
+                right: auto !important;
+            }
+            
+            .header-content {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 1.5rem 1rem !important;
+                box-sizing: border-box !important;
+            }
+            
+            .controls {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 1rem !important;
+                box-sizing: border-box !important;
+                position: relative !important;
+            }
+            
+            /* Navigation adjustments */
+            .nav-drawer {
+                transform: translateX(-100%);
+                left: 0 !important;
+            }
+            
+            .nav-drawer.open {
+                transform: translateX(0);
+            }
+            
+            /* Typography adjustments */
+            .header h1 {
+                font-size: 1.8rem;
+                text-align: center;
+                word-wrap: break-word;
+            }
+            
+            .header-subtitle {
+                font-size: 1rem;
+                text-align: center;
+            }
+            
+            .header-meta {
+                justify-content: center;
+                text-align: center;
+                flex-direction: column;
+                gap: 0.75rem;
+            }
+            
+            /* Search and controls */
+            .search-container {
+                min-width: auto !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            .search-input {
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            
+            .filter-chips {
+                justify-content: center;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+            }
+            
+            .chip {
+                padding: 0.5rem 1rem;
+                font-size: 0.85rem;
+            }
+            
+            /* Main content adjustments */
+            .main-content {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 0 1rem 4rem !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Task cards */
+            .task-header {
+                padding: 1rem;
+            }
+            
+            .task-content {
+                padding: 0 1rem;
+            }
+            
+            .task-card.expanded .task-content {
+                padding: 0 1rem 1rem;
+            }
+            
+            .overview-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .fab {
+                bottom: 1rem;
+                right: 1rem;
+            }
+            
+            /* Ensure no horizontal scroll */
+            body {
+                overflow-x: hidden !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+            }
+            
+            .app-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                overflow-x: hidden !important;
+            }
+            
+            /* Fix any potential viewport issues */
+            html {
+                width: 100% !important;
+                overflow-x: hidden !important;
+            }
+        }
+
+
+        /* Animations */
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .task-card {
+            animation: slideIn 0.5s ease forwards;
+        }
+
+        .task-card:nth-child(1) { animation-delay: 0.1s; }
+        .task-card:nth-child(2) { animation-delay: 0.2s; }
+        .task-card:nth-child(3) { animation-delay: 0.3s; }
+        .task-card:nth-child(4) { animation-delay: 0.4s; }
+        .task-card:nth-child(5) { animation-delay: 0.5s; }
+        .task-card:nth-child(6) { animation-delay: 0.6s; }
+
+        /* Syntax highlighting for code */
+        .code-keyword { color: #569cd6; }
+        .code-string { color: #ce9178; }
+        .code-comment { color: #6a9955; }
+        .code-function { color: #dcdcaa; }
+        .code-number { color: #b5cea8; }
+        .code-class { color: #4ec9b0; }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--background-color);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--text-hint);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Navigation Drawer -->
+        <nav class="nav-drawer" id="navDrawer">
+            <div class="nav-header">
+                <h3>Assignment Navigation</h3>
+            </div>
+            <div class="nav-content">
+                <div class="nav-item active" data-target="overview">
+                    <span class="material-icons">dashboard</span>
+                    <span>Overview</span>
+                </div>
+                <div class="nav-item" data-target="task-1">
+                    <span class="material-icons">settings</span>
+                    <span>Task 1: Environment Setup</span>
+                </div>
+                <div class="nav-item" data-target="task-2">
+                    <span class="material-icons">memory</span>
+                    <span>Task 2: Experience Replay</span>
+                </div>
+                <div class="nav-item" data-target="task-3">
+                    <span class="material-icons">psychology</span>
+                    <span>Task 3: DQN Architecture</span>
+                </div>
+                <div class="nav-item" data-target="task-4">
+                    <span class="material-icons">smart_toy</span>
+                    <span>Task 4: Agent Implementation</span>
+                </div>
+                <div class="nav-item" data-target="task-5">
+                    <span class="material-icons">fitness_center</span>
+                    <span>Task 5: Training Loop</span>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Overlay -->
+        <div class="overlay" id="overlay"></div>
+
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>SpikeVerse Assignment 02</h1>
+                <p class="header-subtitle">Prioritized Double DQN for Atari BreakOut</p>
+                <div class="header-meta">
+                    <div class="meta-item">
+                        <span class="material-icons">event</span>
+                        <span>Due: June 3, 2025</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="material-icons">code</span>
+                        <span>Deep Reinforcement Learning</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="material-icons">videogame_asset</span>
+                        <span>Atari Breakout</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="material-icons">description</span>
+                        <span>Python</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="search-container">
+                <span class="material-icons search-icon">search</span>
+                <input type="text" class="search-input" placeholder="Search tasks, requirements, or code..." id="searchInput">
+            </div>
+            <div class="filter-chips">
+                <div class="chip active" data-filter="all">All Tasks</div>
+                <div class="chip" data-filter="implementation">Implementation</div>
+                <div class="chip" data-filter="architecture">Architecture</div>
+                <div class="chip" data-filter="training">Training</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Overview Card -->
+            <div class="overview-card" id="overview">
+                <h2>Assignment Overview</h2>
+                <p>This assignment extends your journey into Deep Reinforcement Learning by implementing a sophisticated Prioritized Double Deep Q-Network (Prioritized DDQN) agent. You'll build the complete system from scratch, gaining deep understanding of advanced DRL techniques while tackling the challenging Atari Breakout environment.</p>
+
+                <div style="margin-top: 2rem; padding: 1.5rem; background: linear-gradient(135deg, #e3f2fd, #f3e5f5); border-radius: 8px;">
+                    <h4 style="margin-bottom: 1rem; color: var(--primary-color);">📋 Important Note:</h4>
+                    <ul class="requirement-list">
+                        <li>Submit code in <strong>.py</strong> files—either a single file or a structured repository.</li>
+                        
+                        <li>The assignment has two phases: 
+                            <strong>Phase 01</strong> (guided, with detailed instructions) and 
+                            <strong>Phase 02</strong> (open-ended, based on your improvements and experimentation).</li>
+                        
+                        <li>In Phase 01, train for a maximum of 1000 episodes (1 episode = all 5 lives lost) aiming for a mean score of 12.</li>
+                        
+                        <li>In Phase 02, you may modify any part of the code—parameters, architecture, or functionalities—to achieve a human-like mean score of ~30.</li>
+                        
+                        <li>However, maintain the same evaluation protocol: use a 50-episode mean window and retain the training visualization plotting as provided.</li>
+                        
+                        <li><strong>Phase 01 Due:</strong> June 3, 2025 (EOD)</li>
+                        <li><strong>Phase 02 Due:</strong> June 10, 2025 (EOD)</li>
+                    </ul>
+                </div>
+            </div>
+
+<!-- Task 1: Environment Setup -->
+<div class="task-card" id="task-1" data-category="implementation">
+    <div class="task-header">
+        <div class="task-title">
+            <div class="task-number">1</div>
+            <div class="task-info">
+                <h3>Atari Environment Setup</h3>
+                <p class="task-description">Preprocessing, wrapping, and frame stacking for Atari games</p>
+            </div>
+        </div>
+        <div class="task-actions">
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+    </div>
+    <div class="task-content">
+        <div class="task-body">
+            <p>To effectively train an agent on Atari games, raw pixel data needs significant preprocessing. You'll implement frame stacking and create a comprehensive wrapper for the Gym environment.</p>
+
+            <div class="subtask-grid">
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Image Preprocessing Functions</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Implement the following core preprocessing functions:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">def</span> <span class="code-function">rgb_to_grayscale</span>(frame: np.ndarray) -> np.ndarray:
+    <span class="code-comment">"""Converts RGB frame to grayscale using luminosity method"""</span>
+    <span class="code-comment"># Convert RGB to grayscale using standard luminosity weights.</span>
+    <span class="code-comment"># Return the result as uint8 for memory efficiency.</span>
+    <span class="code-keyword">pass</span>
+
+<span class="code-keyword">def</span> <span class="code-function">resize_frame</span>(frame: np.ndarray, target_size: Tuple[<span class="code-class">int</span>, <span class="code-class">int</span>] = (<span class="code-number">84</span>, <span class="code-number">84</span>)) -> np.ndarray:
+    <span class="code-comment">"""Resizes frame using cv2.INTER_AREA interpolation"""</span>
+    <span class="code-comment"># Use OpenCV to resize the frame to the target dimensions.</span>
+    <span class="code-comment"># INTER_AREA interpolation works well for downscaling.</span>
+    <span class="code-keyword">pass</span>
+
+<span class="code-keyword">def</span> <span class="code-function">normalize_frame</span>(frame: np.ndarray) -> np.ndarray:
+    <span class="code-comment">"""Normalizes pixel values to [0.0, 1.0] range"""</span>
+    <span class="code-comment"># Scale pixel values from [0, 255] to [0.0, 1.0] range.</span>
+    <span class="code-comment"># Convert to float32 for neural network compatibility.</span>
+    <span class="code-keyword">pass</span>
+
+<span class="code-keyword">def</span> <span class="code-function">preprocess_frame</span>(frame: np.ndarray) -> np.ndarray:
+    <span class="code-comment">"""Chains grayscale, resize, and normalize operations"""</span>
+    <span class="code-comment"># Combine all preprocessing steps into a single pipeline.</span>
+    <span class="code-comment"># Apply transformations in the correct order for optimal results.</span>
+    <span class="code-keyword">pass</span></code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Frame Stacking Implementation</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Implement a FrameStack class to maintain temporal information:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">class</span> <span class="code-class">FrameStack</span>:
+    <span class="code-keyword">def</span> <span class="code-function">__init__</span>(<span class="code-keyword">self</span>, maxlen: <span class="code-class">int</span> = <span class="code-number">4</span>):
+        <span class="code-comment">"""Initialize deque with maxlen capacity"""</span>
+        <span class="code-comment"># Set up a data structure to store frames with automatic size management.</span>
+        <span class="code-comment"># Store the maximum length for reference in other methods.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">push</span>(<span class="code-keyword">self</span>, frame: np.ndarray) -> <span class="code-class">None</span>:
+        <span class="code-comment">"""Add preprocessed frame to deque"""</span>
+        <span class="code-comment"># Add the new frame to the collection.</span>
+        <span class="code-comment"># The data structure should automatically handle overflow.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">get_stack</span>(<span class="code-keyword">self</span>) -> np.ndarray:
+        <span class="code-comment">"""Return stacked frames as (maxlen, height, width)"""</span>
+        <span class="code-comment"># Create a properly shaped array containing all frames.</span>
+        <span class="code-comment"># Handle cases where fewer frames are available by padding with zeros.</span>
+        <span class="code-comment"># Return frames in channel-first format for CNN input.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">reset</span>(<span class="code-keyword">self</span>) -> <span class="code-class">None</span>:
+        <span class="code-comment">"""Clear the deque"""</span>
+        <span class="code-comment"># Remove all stored frames to start fresh.</span>
+        <span class="code-keyword">pass</span></code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Atari Environment Wrapper</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Create a comprehensive wrapper for the Atari environment:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">class</span> <span class="code-class">AtariWrapper</span>:
+    <span class="code-keyword">def</span> <span class="code-function">__init__</span>(<span class="code-keyword">self</span>, env_name: <span class="code-class">str</span> = <span class="code-string">"BreakoutNoFrameskip-v4"</span>, frame_skip: <span class="code-class">int</span> = <span class="code-number">4</span>):
+        <span class="code-comment">"""Initialize environment and frame stack"""</span>
+        <span class="code-comment"># Create the Gym environment and frame stack manager.</span>
+        <span class="code-comment"># Define the action space mapping for Breakout game.</span>
+        <span class="code-comment"># Store frame skipping parameter for temporal efficiency.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">reset</span>(<span class="code-keyword">self</span>) -> np.ndarray:
+        <span class="code-comment">"""Reset environment and return initial stacked state"""</span>
+        <span class="code-comment"># Reset both the environment and frame stack.</span>
+        <span class="code-comment"># Process the initial observation and create the first state stack.</span>
+        <span class="code-comment"># Return the properly formatted state for the agent.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">step</span>(<span class="code-keyword">self</span>, action: <span class="code-class">int</span>) -> Tuple[np.ndarray, <span class="code-class">float</span>, <span class="code-class">bool</span>, <span class="code-class">dict</span>]:
+        <span class="code-comment">"""Execute action with frame skipping"""</span>
+        <span class="code-comment"># Convert agent action to environment action.</span>
+        <span class="code-comment"># Execute the action multiple times to skip frames.</span>
+        <span class="code-comment"># Accumulate rewards and process the final frame.</span>
+        <span class="code-comment"># Return the new state, total reward, done flag, and info.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">get_state</span>(<span class="code-keyword">self</span>) -> np.ndarray:
+        <span class="code-comment">"""Return current stacked state"""</span>
+        <span class="code-comment"># Return the current frame stack as a state representation.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">close</span>(<span class="code-keyword">self</span>):
+        <span class="code-comment">"""Close the environment"""</span>
+        <span class="code-comment"># Properly close the Gym environment to free resources.</span>
+        <span class="code-keyword">pass</span></code></pre>
+                        </div>
+
+                        <ul class="requirement-list">
+                            <li>Initialize Gym environment with specified name</li>
+                            <li>Set up frame stack with maxlen=4</li>
+                            <li>Define action space for Breakout: [NOOP, FIRE, RIGHT, LEFT]</li>
+                            <li>Implement frame skipping for temporal efficiency</li>
+                            <li>Handle episode termination and truncation properly</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task 2: Prioritized Experience Replay -->
+<div class="task-card" id="task-2" data-category="architecture">
+    <div class="task-header">
+        <div class="task-title">
+            <div class="task-number">2</div>
+            <div class="task-info">
+                <h3>Prioritized Experience Replay (PER)</h3>
+                <p class="task-description">SumTree data structure and prioritized replay buffer implementation</p>
+            </div>
+        </div>
+        <div class="task-actions">
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+    </div>
+    <div class="task-content">
+        <div class="task-body">
+            <p>Prioritized Experience Replay (PER) samples transitions with probability proportional to their TD error, leading to more efficient learning by focusing on experiences with higher learning potential.</p>
+
+            <div class="subtask-grid">
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">SumTree Data Structure</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>The SumTree is crucial for efficient sampling in PER. It enables O(log n) operations for updates and sampling:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">class</span> <span class="code-class">SumTree</span>:
+    <span class="code-keyword">def</span> <span class="code-function">__init__</span>(<span class="code-keyword">self</span>, capacity: <span class="code-class">int</span>):
+        <span class="code-comment">"""Initialize tree structure for efficient priority sampling"""</span>
+        <span class="code-comment"># Setup binary tree arrays and tracking variables</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">_propagate</span>(<span class="code-keyword">self</span>, idx: <span class="code-class">int</span>, change: <span class="code-class">float</span>) -> <span class="code-class">None</span>:
+        <span class="code-comment">"""Propagate priority changes up the tree"""</span>
+        <span class="code-comment"># Update parent nodes recursively to root</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">_retrieve</span>(<span class="code-keyword">self</span>, idx: <span class="code-class">int</span>, s: <span class="code-class">float</span>) -> <span class="code-class">int</span>:
+        <span class="code-comment">"""Retrieve leaf index for given priority value"""</span>
+        <span class="code-comment"># Navigate tree based on cumulative priorities</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">total_priority</span>(<span class="code-keyword">self</span>) -> <span class="code-class">float</span>:
+        <span class="code-comment">"""Return total priority (root value)"""</span>
+        <span class="code-keyword">return</span> <span class="code-keyword">self</span>.tree[<span class="code-number">0</span>]
+    
+    <span class="code-keyword">def</span> <span class="code-function">add</span>(<span class="code-keyword">self</span>, priority: <span class="code-class">float</span>, data: <span class="code-class">object</span>) -> <span class="code-class">None</span>:
+        <span class="code-comment">"""Store experience with priority"""</span>
+        <span class="code-comment"># Add data to tree and propagate changes</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">update</span>(<span class="code-keyword">self</span>, idx: <span class="code-class">int</span>, priority: <span class="code-class">float</span>) -> <span class="code-class">None</span>:
+        <span class="code-comment">"""Update priority of existing experience"""</span>
+        <span class="code-comment"># Update node and propagate change</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">get_leaf</span>(<span class="code-keyword">self</span>, s: <span class="code-class">float</span>) -> Tuple[<span class="code-class">int</span>, <span class="code-class">float</span>, <span class="code-class">object</span>]:
+        <span class="code-comment">"""Sample leaf based on priority value s"""</span>
+        <span class="code-comment"># Find leaf and return index, priority, data</span>
+        <span class="code-keyword">pass</span></code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Prioritized Replay Buffer</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Implement the complete prioritized experience replay buffer:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">class</span> <span class="code-class">PrioritizedReplayBuffer</span>:
+    <span class="code-keyword">def</span> <span class="code-function">__init__</span>(<span class="code-keyword">self</span>, capacity: <span class="code-class">int</span>, alpha: <span class="code-class">float</span> = <span class="code-number">0.6</span>, beta_start: <span class="code-class">float</span> = <span class="code-number">0.4</span>):
+        <span class="code-comment">"""Initialize prioritized replay buffer"""</span>
+        <span class="code-comment"># Set up the SumTree and store prioritization parameters.</span>
+        <span class="code-comment"># Initialize beta annealing schedule and numerical stability constants.</span>
+        <span class="code-comment"># Set up frame counting for importance sampling weight calculation.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">_get_beta</span>(<span class="code-keyword">self</span>) -> <span class="code-class">float</span>:
+        <span class="code-comment">"""Calculate current beta value (anneals to 1.0)"""</span>
+        <span class="code-comment"># Implement linear annealing from beta_start to 1.0 over training.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">push</span>(<span class="code-keyword">self</span>, state, action, reward, next_state, done) -> <span class="code-class">None</span>:
+        <span class="code-comment">"""Store experience with maximum priority"""</span>
+        <span class="code-comment"># Package the experience tuple and assign appropriate priority.</span>
+        <span class="code-comment"># Use maximum existing priority for new experiences to ensure sampling.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">sample</span>(<span class="code-keyword">self</span>, batch_size: <span class="code-class">int</span>) -> Tuple[List, np.ndarray, np.ndarray]:
+        <span class="code-comment">"""Sample batch with importance sampling weights"""</span>
+        <span class="code-comment"># Divide priority range into segments for stratified sampling.</span>
+        <span class="code-comment"># Calculate importance sampling weights to correct for sampling bias.</span>
+        <span class="code-comment"># Return experiences, tree indices, and normalized weights.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">update_priorities</span>(<span class="code-keyword">self</span>, indices, priorities) -> <span class="code-class">None</span>:
+        <span class="code-comment">"""Update priorities based on TD errors"""</span>
+        <span class="code-comment"># Convert TD errors to priorities using alpha exponent.</span>
+        <span class="code-comment"># Add small epsilon for numerical stability.</span>
+        <span class="code-comment"># Update tree nodes with new priority values.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">__len__</span>(<span class="code-keyword">self</span>) -> <span class="code-class">int</span>:
+        <span class="code-comment">"""Return current buffer size"""</span>
+        <span class="code-comment"># Return the number of experiences currently stored.</span>
+        <span class="code-keyword">pass</span></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task 3: DQN Architecture -->
+<div class="task-card" id="task-3" data-category="architecture">
+    <div class="task-header">
+        <div class="task-title">
+            <div class="task-number">3</div>
+            <div class="task-info">
+                <h3>Deep Q-Network (DQN) Architecture</h3>
+                <p class="task-description">Convolutional neural network for processing stacked frames</p>
+            </div>
+        </div>
+        <div class="task-actions">
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+    </div>
+    <div class="task-content">
+        <div class="task-body">
+            <p>Define the convolutional neural network architecture that processes stacked frames and outputs Q-values for each action. The network follows the architecture proven effective for Atari games.</p>
+
+            <div class="subtask-grid">
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">CNN Architecture Design</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Implement a DQN class with the standard Atari CNN architecture:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">class</span> <span class="code-class">DQN</span>(nn.Module):
+    <span class="code-keyword">def</span> <span class="code-function">__init__</span>(<span class="code-keyword">self</span>, input_dim: Tuple[<span class="code-class">int</span>, <span class="code-class">int</span>, <span class="code-class">int</span>], action_dim: <span class="code-class">int</span>):
+        <span class="code-comment">"""Initialize DQN with convolutional layers"""</span>
+        <span class="code-comment"># Set up the parent class and define three convolutional layers.</span>
+        <span class="code-comment"># Use progressively smaller kernels and increasing channels.</span>
+        <span class="code-comment"># Calculate the flattened size after convolutions for fully connected layers.</span>
+        <span class="code-comment"># Add two fully connected layers to map features to Q-values.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">_get_conv_out_size</span>(<span class="code-keyword">self</span>, shape: Tuple[<span class="code-class">int</span>, <span class="code-class">int</span>, <span class="code-class">int</span>]) -> <span class="code-class">int</span>:
+        <span class="code-comment">"""Calculate output size of convolutional layers"""</span>
+        <span class="code-comment"># Pass a dummy tensor through the convolutional layers.</span>
+        <span class="code-comment"># Calculate the total number of features after flattening.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">forward</span>(<span class="code-keyword">self</span>, x: torch.Tensor) -> torch.Tensor:
+        <span class="code-comment">"""Forward pass through the network"""</span>
+        <span class="code-comment"># Apply convolutional layers with ReLU activations.</span>
+        <span class="code-comment"># Flatten the feature maps for fully connected processing.</span>
+        <span class="code-comment"># Apply fully connected layers and return raw Q-values.</span>
+        <span class="code-keyword">pass</span></code></pre>
+                        </div>
+
+                        <div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+                            <h5 style="margin-bottom: 0.5rem; color: var(--primary-color);">🏗️ Network Architecture</h5>
+                            <ul class="requirement-list" style="margin: 0;">
+                                <p><strong>Suggested Architecture to ensure fast training on CPU only PCs; Experiment with it for improved results in Phase 2.</strong></p>
+                                <li><strong>Conv1:</strong> 4→16 channels, 8×8 kernel, stride 4</li>
+                                <li><strong>Conv2:</strong> 16→32 channels, 4×4 kernel, stride 2</li>
+                                <li><strong>Conv3:</strong> 32→32 channels, 3×3 kernel, stride 1</li>
+                                <li><strong>FC1:</strong> Flattened features → 256 units</li>
+                                <li><strong>FC2:</strong> 256 → 4 Q-values (one per action)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task 4: Agent Implementation -->
+<div class="task-card" id="task-4" data-category="implementation">
+    <div class="task-header">
+        <div class="task-title">
+            <div class="task-number">4</div>
+            <div class="task-info">
+                <h3>Agent Implementation with Double DQN and PER</h3>
+                <p class="task-description">Complete agent combining networks, replay buffer, and learning algorithm</p>
+            </div>
+        </div>
+        <div class="task-actions">
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+    </div>
+    <div class="task-content">
+        <div class="task-body">
+            <p>Combine the neural network, prioritized replay buffer, and Double DQN learning algorithm into a complete agent capable of learning complex Atari games.</p>
+
+            <div class="subtask-grid">
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Double DQN Loss Function</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Implement the Double DQN loss computation with importance sampling:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">def</span> <span class="code-function">compute_double_dqn_loss</span>(policy_net, target_net, states, actions, 
+                              rewards, next_states, dones, gamma, is_weights):
+    <span class="code-comment">"""Compute Double DQN loss with importance sampling"""</span>
+    
+    <span class="code-comment"># Extract Q-values for the actions that were actually taken.</span>
+    <span class="code-comment"># Use the policy network to select the best next actions.</span>
+    <span class="code-comment"># Evaluate those selected actions using the target network.</span>
+    <span class="code-comment"># Compute target Q-values using the Bellman equation.</span>
+    <span class="code-comment"># Calculate temporal difference errors for priority updates.</span>
+    <span class="code-comment"># Apply importance sampling weights if provided to correct sampling bias.</span>
+    <span class="code-comment"># Return both the loss value and TD errors for priority updates.</span>
+    <span class="code-keyword">pass</span></code></pre>
+                        </div>
+
+                        <div style="margin-top: 1rem; padding: 1rem; background: #fff3e0; border-radius: 8px;">
+                            <h5 style="margin-bottom: 0.5rem; color: var(--warning-color);">🎯 Double DQN Benefits</h5>
+                            <p style="margin: 0; font-size: 0.95rem;">Double DQN reduces overestimation bias by decoupling action selection from action evaluation. The policy network selects actions, while the target network evaluates them.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Advanced DQN Agent Class</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Implement the complete agent with all components:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">class</span> <span class="code-class">AdvancedDQNAgent</span>:
+    <span class="code-keyword">def</span> <span class="code-function">__init__</span>(<span class="code-keyword">self</span>, state_shape, action_size, config):
+        <span class="code-comment">"""Initialize agent with networks and replay buffer"""</span>
+        <span class="code-comment"># Store network dimensions and configuration parameters.</span>
+        <span class="code-comment"># Create policy and target networks with identical architectures.</span>
+        <span class="code-comment"># Initialize the target network with policy network weights.</span>
+        <span class="code-comment"># Set up the optimizer and prioritized replay buffer.</span>
+        <span class="code-comment"># Configure exploration parameters for epsilon-greedy strategy.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">select_action</span>(<span class="code-keyword">self</span>, state: np.ndarray) -> <span class="code-class">int</span>:
+        <span class="code-comment">"""Epsilon-greedy action selection"""</span>
+        <span class="code-comment"># Calculate current epsilon value using exponential decay schedule.</span>
+        <span class="code-comment"># Choose between random exploration and greedy exploitation.</span>
+        <span class="code-comment"># For greedy actions, use the policy network to select best action.</span>
+        <span class="code-keyword">pass</span></code></pre>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Learning and Update Methods</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code>    <span class="code-keyword">def</span> <span class="code-function">store_transition</span>(<span class="code-keyword">self</span>, state, action, reward, next_state, done):
+        <span class="code-comment">"""Store experience in replay buffer"""</span>
+        <span class="code-comment"># Add the experience tuple to the prioritized replay buffer.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">update</span>(<span class="code-keyword">self</span>) -> Optional[<span class="code-class">float</span>]:
+        <span class="code-comment">"""Perform learning update"""</span>
+        <span class="code-comment"># Check if sufficient experiences are available for training.</span>
+        <span class="code-comment"># Sample a batch from the prioritized replay buffer.</span>
+        <span class="code-comment"># Convert experience components to tensors and move to device.</span>
+        <span class="code-comment"># Compute Double DQN loss and TD errors.</span>
+        <span class="code-comment"># Update experience priorities based on TD errors.</span>
+        <span class="code-comment"># Perform gradient descent optimization step.</span>
+        <span class="code-keyword">pass</span>
+    
+    <span class="code-keyword">def</span> <span class="code-function">update_target_network</span>(<span class="code-keyword">self</span>):
+        <span class="code-comment">"""Copy weights from policy to target network"""</span>
+        <span class="code-comment"># Synchronize target network weights with policy network.</span>
+        <span class="code-keyword">pass</span></code></pre>
+                        </div>
+
+                        <ul class="requirement-list">
+                            <li>Implement epsilon-greedy exploration with exponential decay</li>
+                            <li>Handle batch sampling from prioritized replay buffer</li>
+                            <li>Update priorities based on TD errors</li>
+                            <li>Perform gradient descent optimization</li>
+                            <li>Support target network synchronization</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Task 5: Training Loop -->
+<div class="task-card" id="task-5" data-category="training">
+    <div class="task-header">
+        <div class="task-title">
+            <div class="task-number">5</div>
+            <div class="task-info">
+                <h3>Training Loop and Evaluation on Breakout</h3>
+                <p class="task-description">Complete training pipeline with monitoring and visualization</p>
+            </div>
+        </div>
+        <div class="task-actions">
+            <span class="material-icons expand-icon">expand_more</span>
+        </div>
+    </div>
+    <div class="task-content">
+        <div class="task-body">
+            <p>Set up and run the training loop for the agent on "BreakoutNoFrameskip-v4" with comprehensive monitoring, evaluation, and visualization of training progress.</p>
+
+            <div class="subtask-grid">
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Training Configuration</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Use the following hyperparameters for optimal performance:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code>config = {
+    <span class="code-string">'learning_rate'</span>: <span class="code-number">2e-4</span>,  <span class="code-comment"># Learning rate for the optimizer</span>
+    <span class="code-string">'gamma'</span>: <span class="code-number">0.99</span>,  <span class="code-comment"># Discount factor for future rewards</span>
+    <span class="code-string">'buffer_size'</span>: <span class="code-number">20000</span>,  <span class="code-comment"># Maximum size of the replay buffer</span>
+    <span class="code-string">'batch_size'</span>: <span class="code-number">16</span>,  <span class="code-comment"># Number of samples to draw from the buffer for each training step</span>
+    <span class="code-string">'target_update_freq'</span>: <span class="code-number">500</span>,  <span class="code-comment"># Frequency (in training steps) to update the target network</span>
+    <span class="code-string">'initial_replay_size'</span>: <span class="code-number">5000</span>,  <span class="code-comment"># Minimum number of experiences in the buffer before training starts</span>
+    <span class="code-string">'alpha'</span>: <span class="code-number">0.6</span>,  <span class="code-comment"># PER prioritization</span>
+    <span class="code-string">'beta_start'</span>: <span class="code-number">0.4</span>,  <span class="code-comment"># PER importance sampling</span>
+    <span class="code-string">'max_episodes'</span>: <span class="code-number">1000</span>,  <span class="code-comment"># Maximum number of episodes to run</span>
+    <span class="code-string">'target_score'</span>: <span class="code-number">12.0</span>,  <span class="code-comment"># Mean score over 50 episodes</span>
+}</code></pre>
+                        </div>
+
+                        <div style="margin-top: 1rem; padding: 1rem; background: linear-gradient(135deg, #e3f2fd, #f3e5f5); border-radius: 8px;">
+                            <h5 style="margin-bottom: 0.5rem; color: var(--primary-color);">⚙️ Hyperparameter Rationale</h5>
+                            <ul class="requirement-list" style="margin: 0;">
+                                <li><strong>These Hyperparameters Are Specifically Suggested for Fast Training on CPU-Only PCs (Because Most of You Do Not Have GPU Access for Long Intervals), but You All Are Allowed and Encouraged to Tune Better Parameters to Obtain Better Results in Phase 2 of the Assignment.</strong></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Main Training Function Implementation</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Implement the complete training loop with comprehensive monitoring:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">def</span> <span class="code-function">train_agent</span>():
+    <span class="code-comment">"""Main training loop with comprehensive monitoring"""</span>
+    <span class="code-comment"># Initialize the Atari environment wrapper and DQN agent.</span>
+    <span class="code-comment"># Set up tracking variables for metrics and timing.</span>
+    <span class="code-comment"># Implement the main episode loop with proper environment interaction.</span>
+    <span class="code-comment"># Handle experience storage, agent updates, and target network synchronization.</span>
+    <span class="code-comment"># Monitor training progress with comprehensive logging and statistics.</span>
+    <span class="code-comment"># Implement early stopping when target performance is achieved.</span>
+    <span class="code-comment"># Return training metrics and the trained agent for analysis.</span>
+    <span class="code-keyword">pass</span></code></pre>
+                        </div>
+
+                        <ul class="requirement-list">
+                            <li>Initialize AtariWrapper with "BreakoutNoFrameskip-v4" and frame_skip=4</li>
+                            <li>Initialize AdvancedDQNAgent with state shape (4, 84, 84) and 4 actions</li>
+                            <li>Track episode rewards, lengths, losses, and mean scores</li>
+                            <li>Implement comprehensive progress reporting with ETA calculation</li>
+                            <li>Check for target achievement (mean score ≥12.0 over last 50 episodes)</li>
+                            <li>Train the network for a maximum of 1000 episodes only (for Phase 01)</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Visualization and Plotting Function</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <p>Create comprehensive training result visualization:</p>
+                        
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">def</span> <span class="code-function">plot_training_results</span>(episode_rewards, mean_scores, losses):
+    <span class="code-comment">"""Create comprehensive training visualization"""</span>
+    <span class="code-comment"># Set up a multi-panel figure to display various training metrics.</span>
+    <span class="code-comment"># Plot episode rewards with rolling mean to show learning progress.</span>
+    <span class="code-comment"># Display mean score progression with target achievement line.</span>
+    <span class="code-comment"># Show training loss evolution to monitor learning stability.</span>
+    <span class="code-comment"># Create score distribution histogram to analyze performance spread.</span>
+    <span class="code-comment"># Add proper labeling, legends, and save the results.</span>
+    <span class="code-keyword">pass</span></code></pre>
+                        </div>
+
+                        <ul class="requirement-list">
+                            <li>Example plot (based on random policy): </li>
+                        </ul>
+                        <!-- Add image here -->
+                        <img src="training_results.png" alt="Training Results" class="full-width-image" />
+                    </div>
+                </div>
+
+                <div class="subtask-item">
+                    <div class="subtask-header">
+                        <h4 class="subtask-title">Main Execution Block</h4>
+                        <span class="material-icons">expand_more</span>
+                    </div>
+                    <div class="subtask-content">
+                        <div class="code-block">
+                            <div class="code-header">
+                                <span class="code-language">Python</span>
+                                <button class="copy-btn">Copy</button>
+                            </div>
+<pre><code><span class="code-keyword">if</span> __name__ == <span class="code-string">"__main__"</span>:
+    <span class="code-comment">"""Main execution block for the assignment"""</span>
+    <span class="code-comment"># Display assignment title and information.</span>
+    <span class="code-comment"># Execute the training process and collect results.</span>
+    <span class="code-comment"># Generate and display comprehensive visualizations.</span>
+    <span class="code-comment"># Print completion message and file references.</span>
+    <span class="code-keyword">pass</span></code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+    <h5 style="margin-bottom: 0.5rem; color: var(--primary-color);">🏗️ Phase 01 will be considered completed when:</h5>
+    <ul class="requirement-list" style="margin: 0;">
+        <p><strong>Either: </strong>A mean score of 12 (over last 50 episodes) is acheived before 1000 episodes of training.</p>
+        <p><strong>Or: </strong>1000 episodes of training gets completed with a minimum peak mean score of 8 (over any consecutive 50 episodes).</p>
+        <p><strong>In both the cases: </strong>Note the number of training episodes (<=1000), and peak mean score acheived.</p>
+        <p><strong>Once this is done, make a submission for Phase 01 and then go for building on top of this code to acheive a better mean score of about 30 in the Phase 02 which is all about Exploration, Experimentation and Improvement of the model.</strong></p>
+    </ul>
+</div>
+
+<div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
+    <h5 style="margin-bottom: 0.5rem; color: var(--primary-color);">🧪 Example Ideas to Explore in Phase 02</h5>
+    <ul class="requirement-list" style="margin: 0;">
+        <p><strong>Tune Hyperparameters:</strong> Optimize learning rate, gamma, batch size, and update frequency.</p>
+        <p><strong>Improve Architecture:</strong> Use deeper/wider CNNs or try residual connections for better feature extraction.</p>
+        <p><strong>Enhance PER:</strong> Adjust α and β in prioritized replay for more effective sampling.</p>
+        <p><strong>Use Noisy Networks:</strong> Replace ε-greedy with parameter noise for better exploration.</p>
+        <p><strong>Try N-Step Returns:</strong> Incorporate multi-step learning for improved stability and reward propagation.</p>
+        <p>...Try More!!</p>
+        <p><strong>In Phase 02, you may increase the number of training episodes (you should), but remember to save model checkpoints periodically so that you can resume training across multiple sittings. These models can take a long time to achieve a decent score, so smart teamwork is strongly encouraged.</p>
+    </ul>
+</div>
+
+
+        <!-- Floating Action Button -->
+        <button class="fab" id="fabBtn" title="Quick Navigation">
+            <span class="material-icons">menu</span>
+        </button>
+    </div>
+
+    <script>
+        class AssignmentApp {
+            constructor() {
+                this.initializeElements();
+                this.setupEventListeners();
+                this.setupSearch();
+                this.updateProgress();
+                this.animateCards();
+            }
+
+            initializeElements() {
+                this.navDrawer = document.getElementById('navDrawer');
+                this.overlay = document.getElementById('overlay');
+                this.fabBtn = document.getElementById('fabBtn');
+                this.searchInput = document.getElementById('searchInput');
+                this.taskCards = document.querySelectorAll('.task-card');
+                this.filterChips = document.querySelectorAll('.chip');
+                this.navItems = document.querySelectorAll('.nav-item');
+            }
+
+            setupEventListeners() {
+                // FAB and navigation
+                this.fabBtn.addEventListener('click', () => this.toggleNavigation());
+                this.overlay.addEventListener('click', () => this.closeNavigation());
+
+                // Task card expansion
+                this.taskCards.forEach(card => {
+                    const header = card.querySelector('.task-header');
+                    header.addEventListener('click', () => this.toggleCard(card));
+                });
+
+                // Subtask expansion
+                document.querySelectorAll('.subtask-item').forEach(item => {
+                    const header = item.querySelector('.subtask-header');
+                    if (header) {
+                        header.addEventListener('click', () => this.toggleSubtask(item));
+                    }
+                });
+
+                // Filter chips
+                this.filterChips.forEach(chip => {
+                    chip.addEventListener('click', () => this.handleFilter(chip));
+                });
+
+                // Navigation items
+                this.navItems.forEach(item => {
+                    item.addEventListener('click', () => this.navigateToSection(item));
+                });
+
+                // Copy buttons
+                document.querySelectorAll('.copy-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => this.copyCode(e));
+                });
+
+                // Keyboard shortcuts
+                document.addEventListener('keydown', (e) => this.handleKeyboard(e));
+
+                // Progress tracking
+                this.setupProgressTracking();
+            }
+
+            toggleNavigation() {
+                const isOpen = this.navDrawer.classList.contains('open');
+                if (isOpen) {
+                    this.closeNavigation();
+                } else {
+                    this.openNavigation();
+                }
+            }
+
+            openNavigation() {
+                this.navDrawer.classList.add('open');
+                this.overlay.classList.add('show');
+                document.body.style.overflow = 'hidden';
+            }
+
+            closeNavigation() {
+                this.navDrawer.classList.remove('open');
+                this.overlay.classList.remove('show');
+                document.body.style.overflow = '';
+            }
+
+            toggleCard(card) {
+                const isExpanded = card.classList.contains('expanded');
+                
+                // Close all other cards (accordion behavior)
+                this.taskCards.forEach(otherCard => {
+                    if (otherCard !== card) {
+                        otherCard.classList.remove('expanded');
+                    }
+                });
+
+                // Toggle current card
+                card.classList.toggle('expanded');
+                
+                // Update progress if expanding
+                if (!isExpanded) {
+                    this.markCardAsVisited(card);
+                }
+
+                // Smooth scroll to card
+                if (!isExpanded) {
+                    setTimeout(() => {
+                        card.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'nearest' 
+                        });
+                    }, 100);
+                }
+            }
+
+            toggleSubtask(item) {
+                item.classList.toggle('expanded');
+                
+                // Rotate icon
+                const icon = item.querySelector('.subtask-header .material-icons');
+                if (icon) {
+                    icon.style.transform = item.classList.contains('expanded') 
+                        ? 'rotate(180deg)' 
+                        : 'rotate(0deg)';
+                }
+            }
+
+            handleFilter(selectedChip) {
+                // Update active chip
+                this.filterChips.forEach(chip => chip.classList.remove('active'));
+                selectedChip.classList.add('active');
+
+                const filter = selectedChip.dataset.filter;
+                
+                // Filter cards
+                this.taskCards.forEach(card => {
+                    const category = card.dataset.category;
+                    const shouldShow = filter === 'all' || category === filter;
+                    
+                    card.style.display = shouldShow ? 'block' : 'none';
+                    
+                    if (shouldShow) {
+                        card.style.animation = 'slideIn 0.5s ease forwards';
+                    }
+                });
+
+                // Update search if needed
+                this.performSearch();
+            }
+
+            navigateToSection(navItem) {
+                const target = navItem.dataset.target;
+                const element = document.getElementById(target);
+                
+                if (element) {
+                    // Update active nav item
+                    this.navItems.forEach(item => item.classList.remove('active'));
+                    navItem.classList.add('active');
+                    
+                    // Close navigation
+                    this.closeNavigation();
+                    
+                    // Scroll to element
+                    element.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'start' 
+                    });
+                    
+                    // Expand card if it's a task
+                    if (element.classList.contains('task-card')) {
+                        setTimeout(() => {
+                            this.toggleCard(element);
+                        }, 500);
+                    }
+                }
+            }
+
+            setupSearch() {
+                let searchTimeout;
+                this.searchInput.addEventListener('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        this.performSearch(e.target.value);
+                    }, 300);
+                });
+            }
+
+            performSearch(query = '') {
+                const searchTerm = query || this.searchInput.value;
+                const normalizedQuery = searchTerm.toLowerCase().trim();
+                
+                if (!normalizedQuery) {
+                    this.taskCards.forEach(card => {
+                        const currentFilter = document.querySelector('.chip.active').dataset.filter;
+                        const category = card.dataset.category;
+                        const shouldShow = currentFilter === 'all' || category === currentFilter;
+                        card.style.display = shouldShow ? 'block' : 'none';
+                    });
+                    return;
+                }
+
+                this.taskCards.forEach(card => {
+                    const content = card.textContent.toLowerCase();
+                    const matches = content.includes(normalizedQuery);
+                    const currentFilter = document.querySelector('.chip.active').dataset.filter;
+                    const category = card.dataset.category;
+                    const passesFilter = currentFilter === 'all' || category === currentFilter;
+                    
+                    card.style.display = (matches && passesFilter) ? 'block' : 'none';
+                    
+                    // Highlight matching text
+                    if (matches && passesFilter) {
+                        this.highlightSearchTerm(card, normalizedQuery);
+                    }
+                });
+            }
+
+            highlightSearchTerm(card, term) {
+                // Simple highlighting implementation
+                const textNodes = this.getTextNodes(card);
+                textNodes.forEach(node => {
+                    const text = node.textContent;
+                    const regex = new RegExp(`(${term})`, 'gi');
+                    if (regex.test(text)) {
+                        const highlightedText = text.replace(regex, '<mark>$1</mark>');
+                        const wrapper = document.createElement('div');
+                        wrapper.innerHTML = highlightedText;
+                        node.parentNode.replaceChild(wrapper, node);
+                    }
+                });
+            }
+
+            getTextNodes(element) {
+                const textNodes = [];
+                const walker = document.createTreeWalker(
+                    element,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+                
+                let node;
+                while (node = walker.nextNode()) {
+                    if (node.textContent.trim()) {
+                        textNodes.push(node);
+                    }
+                }
+                return textNodes;
+            }
+
+            copyCode(event) {
+                const button = event.target;
+                const codeBlock = button.closest('.code-block');
+                const code = codeBlock.querySelector('code');
+                
+                if (code) {
+                    navigator.clipboard.writeText(code.textContent).then(() => {
+                        const originalText = button.textContent;
+                        button.textContent = 'Copied!';
+                        button.style.background = 'var(--success-color)';
+                        
+                        setTimeout(() => {
+                            button.textContent = originalText;
+                            button.style.background = '';
+                        }, 2000);
+                    }).catch(() => {
+                        button.textContent = 'Failed';
+                        setTimeout(() => {
+                            button.textContent = 'Copy';
+                        }, 2000);
+                    });
+                }
+            }
+
+            handleKeyboard(event) {
+                // Keyboard shortcuts
+                if (event.ctrlKey || event.metaKey) {
+                    switch (event.key) {
+                        case 'k':
+                            event.preventDefault();
+                            this.searchInput.focus();
+                            break;
+                        case 'b':
+                            event.preventDefault();
+                            this.toggleNavigation();
+                            break;
+                    }
+                }
+                
+                if (event.key === 'Escape') {
+                    this.closeNavigation();
+                }
+            }
+
+            setupProgressTracking() {
+                this.visitedCards = new Set();
+                this.completedTasks = new Set();
+                
+                // Load progress from localStorage
+                const savedProgress = localStorage.getItem('assignmentProgress');
+                if (savedProgress) {
+                    const progress = JSON.parse(savedProgress);
+                    this.visitedCards = new Set(progress.visited || []);
+                    this.completedTasks = new Set(progress.completed || []);
+                }
+                
+                this.updateProgressDisplay();
+            }
+
+            markCardAsVisited(card) {
+                const cardId = card.id;
+                if (cardId) {
+                    this.visitedCards.add(cardId);
+                    this.saveProgress();
+                    this.updateProgressDisplay();
+                }
+            }
+
+            markTaskAsCompleted(taskId) {
+                this.completedTasks.add(taskId);
+                this.saveProgress();
+                this.updateProgressDisplay();
+                
+                // Update task status badge
+                const task = document.getElementById(taskId);
+                if (task) {
+                    const badge = task.querySelector('.status-badge');
+                    if (badge) {
+                        badge.className = 'status-badge completed';
+                        badge.innerHTML = '<span class="material-icons" style="font-size: 1rem;">check_circle</span>Completed';
+                    }
+                }
+            }
+
+            saveProgress() {
+                const progress = {
+                    visited: Array.from(this.visitedCards),
+                    completed: Array.from(this.completedTasks),
+                    timestamp: Date.now()
+                };
+                localStorage.setItem('assignmentProgress', JSON.stringify(progress));
+            }
+
+            updateProgressDisplay() {
+                const totalTasks = 6;
+                const completedCount = this.completedTasks.size;
+                const percentage = (completedCount / totalTasks) * 100;
+                
+                // Update progress ring
+                const progressRing = document.querySelector('.progress-ring .progress');
+                if (progressRing) {
+                    const circumference = 2 * Math.PI * 16; // radius = 16
+                    const offset = circumference - (percentage / 100) * circumference;
+                    progressRing.style.strokeDashoffset = offset;
+                }
+                
+                // Update progress text
+                const progressText = document.querySelector('.progress-bar div:last-child div:last-child');
+                if (progressText) {
+                    progressText.textContent = `${completedCount}/${totalTasks} tasks`;
+                }
+            }
+
+            updateProgress() {
+                // Initialize progress tracking
+                this.updateProgressDisplay();
+            }
+
+            animateCards() {
+                // Add staggered animation delays
+                this.taskCards.forEach((card, index) => {
+                    card.style.animationDelay = `${index * 0.1}s`;
+                });
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', () => {
+            new AssignmentApp();
+        });
+
+        // Add some utility functions for enhanced interactivity
+        function createRippleEffect(event) {
+            const button = event.currentTarget;
+            const ripple = document.createElement('span');
+            const rect = button.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height);
+            const x = event.clientX - rect.left - size / 2;
+            const y = event.clientY - rect.top - size / 2;
+            
+            ripple.style.width = ripple.style.height = size + 'px';
+            ripple.style.left = x + 'px';
+            ripple.style.top = y + 'px';
+            ripple.classList.add('ripple');
+            
+            button.appendChild(ripple);
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        }
+
+        // Add ripple effect to interactive elements
+        document.addEventListener('DOMContentLoaded', () => {
+            const interactiveElements = document.querySelectorAll('.chip, .nav-item, .fab');
+            interactiveElements.forEach(element => {
+                element.addEventListener('click', createRippleEffect);
+            });
+        });
+
+        // Add CSS for ripple effect
+        const rippleStyles = `
+            .ripple {
+                position: absolute;
+                border-radius: 50%;
+                background: rgba(255, 255, 255, 0.6);
+                transform: scale(0);
+                animation: ripple 0.6s linear;
+                pointer-events: none;
+            }
+            
+            @keyframes ripple {
+                to {
+                    transform: scale(4);
+                    opacity: 0;
+                }
+            }
+        `;
+        
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = rippleStyles;
+        document.head.appendChild(styleSheet);
+    </script>
+</body>
+</html>
